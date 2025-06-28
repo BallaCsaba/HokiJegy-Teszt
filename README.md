@@ -1,6 +1,17 @@
-# Getting Started with Create React App
+# Hoki Jegy - React Seat Reservation Site
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Introduction
+
+Hoki Jegy is a React-based seat reservation site for [insert brief description of the site's purpose]. This site allows users to [insert brief description of the site's functionality].
+
+## Getting Started
+
+To get started with the site, follow these steps:
+
+1. Clone the repository: `git clone https://github.com/BallaCsaba/HokiJegy.git`
+2. Install dependencies: `npm install`
+3. Start the development server: `npm start`
+4. Open the site in your web browser: `http://localhost:3000`
 
 ## Available Scripts
 
