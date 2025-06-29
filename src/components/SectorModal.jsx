@@ -251,9 +251,10 @@ const SectorModal = ({ open, sector, onClose, svgMarkup, modalOpen }) => {
   return ReactDOM.createPortal(
     <div
       style={{
-        position: 'fixed',
+        position: 'absolute',
         top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.4)',
+
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -265,12 +266,13 @@ const SectorModal = ({ open, sector, onClose, svgMarkup, modalOpen }) => {
         className="glass-modal flex flex-col overflow-hidden"
         style={{
           width: '90vw',
-          height: '80vh',
-          maxWidth: '900px',
-          maxHeight: '900px',
+          height: '100vh',
+          maxWidth: '50%',
+          /* maxHeight: '50%', */
           minWidth: '16vw',
           minHeight: '16vh',
           position: 'center',
+          maxHeight: '100vh', // add this style
           // On large screens, use 50vw/50vh
           ...(window.innerWidth >= 1024 ? {
             width: '60vw',
@@ -300,6 +302,31 @@ const SectorModal = ({ open, sector, onClose, svgMarkup, modalOpen }) => {
         </button>
         <h2 style={{ margin: '24px 0 0 0', textAlign: 'center' }}>Sector: {sector.id}</h2>
         {seatExtractionWarning}
+        {selectedSeats.length > 0 && (
+          <div style={{ textAlign: 'center', margin: '16px 0' }}>
+            <button
+              style={{
+                background: '#1976d2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '10px 24px',
+                fontSize: 18,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                marginTop: 8,
+              }}
+              onClick={() => {
+                // eslint-disable-next-line no-alert
+                alert('Az uleohelyek le lettek foglalva. (The seats have been reserved.)');
+                // eslint-disable-next-line no-console
+                console.log('Az uleohelyek le lettek foglalva. (The seats have been reserved.)');
+              }}
+            >
+              Foglalás véglegesítése / Finalize Reservation
+            </button>
+          </div>
+        )}
         <div
           ref={containerRef}
           className="flex-1 flex items-center justify-center min-h-0 min-w-0 relative mb-6"
@@ -379,31 +406,7 @@ const SectorModal = ({ open, sector, onClose, svgMarkup, modalOpen }) => {
             </svg>
           </div>
         </div>
-        {selectedSeats.length > 0 && (
-          <div style={{ textAlign: 'center', margin: '16px 0' }}>
-            <button
-              style={{
-                background: '#1976d2',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 6,
-                padding: '10px 24px',
-                fontSize: 18,
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                marginTop: 8,
-              }}
-              onClick={() => {
-                // eslint-disable-next-line no-alert
-                alert('Az uleohelyek le lettek foglalva. (The seats have been reserved.)');
-                // eslint-disable-next-line no-console
-                console.log('Az uleohelyek le lettek foglalva. (The seats have been reserved.)');
-              }}
-            >
-              Foglalás véglegesítése / Finalize Reservation
-            </button>
-          </div>
-        )}
+        
       </div>
     </div>,
     document.body

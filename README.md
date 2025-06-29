@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Hoki Jegy is a React-based seat reservation site for reservation of seats.
+Hoki Jegy is a React-based seat reservation site for [insert brief description of the site's purpose]. This site allows users to [insert brief description of the site's functionality].
 
 ## Getting Started
 
