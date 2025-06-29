@@ -266,8 +266,8 @@ const SectorModal = ({ open, sector, onClose, svgMarkup, modalOpen }) => {
         style={{
           width: '90vw',
           height: '80vh',
-          maxWidth: '50%',
-          maxHeight: '60%',
+          maxWidth: '900px',
+          maxHeight: '900px',
           minWidth: '16vw',
           minHeight: '16vh',
           position: 'center',
