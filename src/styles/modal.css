@@ -1,0 +1,77 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.35); /* translucent dark overlay */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #fff;
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  transition: color 0.3s ease;
+}
+
+.modal-close:hover {
+  color: #ff4d4d;
+}
+
+.modal-controls button {
+  margin-right: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.modal-controls button:hover:not(:disabled) {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.modal-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.modal-controls button:nth-child(1),
+.modal-controls button:nth-child(2) {
+  background-color: #007bff;
+}
+
+.modal-controls button:nth-child(1):hover,
+.modal-controls button:nth-child(2):hover {
+  background-color: #0056b3;
+}
+
+.modal-controls button:nth-child(3) {
+  background-color: #28a745;
+}
+
+.modal-controls button:nth-child(3):hover:not(:disabled) {
+  background-color: #1e7e34;
+}

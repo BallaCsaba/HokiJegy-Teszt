@@ -1,279 +1,164 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useSectorModal } from './hooks/useSectorModal';
+import React, { useState, useRef, useEffect } from 'react';
 import SectorModal from './components/SectorModal';
-import svgRaw, { ReactComponent as VectorsSVG } from './assets/SECTORS_O.svg';
 import PropTypes from 'prop-types';
 
 const DEFAULT_FILL = '#e0e0e0';
 const HOVER_FILL = '#ffe082';
 const ACTIVE_FILL = '#ffd54f';
 
-const MapContainer = ({
-  width = 800,
-  height = 600,
-  defaultFill = DEFAULT_FILL,
-}) => {
-  const {
-    modalOpen,
-    selectedSector,
-    handleSectorClick: openSectorModal,
-    closeModal,
-  } = useSectorModal();
-
-  // Pan and zoom state
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef(null);
-  const [zoom, setZoom] = useState(1);
-
-  // Highlight state
-  const [hoveredSector, setHoveredSector] = useState(null);
+const VectorShapes = () => {
+  const [svgMarkup, setSvgMarkup] = useState({ width: 0, height: 0, sectors: [], bounds: null });
+  const [selectedSector, setSelectedSector] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [activeSector, setActiveSector] = useState(null);
 
-  // Extract paths and viewBox from the imported SVG component
-  const [sectors, setSectors] = useState([]);
-  const [svgViewBox, setSvgViewBox] = useState('0 0 800 600');
-  const svgExtractRef = useRef(null); // For extracting paths/viewBox
-  const svgWheelRef = useRef(null);   // For visible SVG wheel event
+  const svgRef = useRef(null);
 
-  useEffect(() => {
-    console.log(`Current pan position: x=${pan.x}, y=${pan.y}`);
-  }, [pan]);
-
-  // Store SVG markup as string for seat extraction
-  const [svgMarkup, setSvgMarkup] = useState('');
-  useEffect(() => {
-    if (typeof svgRaw === 'string' && svgRaw.endsWith('.svg')) {
-      fetch(svgRaw)
-        .then(res => res.text())
-        .then(setSvgMarkup)
-        .catch(() => setSvgMarkup(''));
-    } else if (typeof svgRaw === 'string') {
-      setSvgMarkup(svgRaw);
+  // Extract points from path string for bounding box calculations
+  const extractPointsFromPath = (pathStr) => {
+    if (!pathStr) return [];
+    const nums = pathStr.match(/-?\d*\.?\d+/g);
+    if (!nums) return [];
+    const points = [];
+    for (let i = 0; i < nums.length - 1; i += 2) {
+      points.push({ x: parseFloat(nums[i]), y: parseFloat(nums[i + 1]) });
     }
-  }, []);
+    return points;
+  };
 
-  useEffect(() => {
-    // Extract and process SVG paths as soon as the SVG is available
-    if (svgExtractRef.current) {
-      const svg = svgExtractRef.current;
-      // Extract viewBox from the SVG
-      const viewBox = svg.getAttribute('viewBox');
-      if (viewBox) {
-        setSvgViewBox(viewBox);
-      }
-      const paths = svg.querySelectorAll('path');
-      const newSectors = [];
-      paths.forEach((path, idx) => {
-        const id = path.getAttribute('id') || `sector-${idx}`;
-        const d = path.getAttribute('d') || '';
-        let fill = path.getAttribute('fill');
-        if (!fill || fill === 'none') fill = defaultFill;
-        newSectors.push({ id, d, fill });
+  // Calculate bounding box for all sectors combined
+  const calculateBounds = (sectors) => {
+    if (!sectors || sectors.length === 0) {
+      return { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    sectors.forEach(sector => {
+      const points = extractPointsFromPath(sector.svgPathData);
+      points.forEach(({ x, y }) => {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
       });
-      setSectors(newSectors);
-    }
-  }, [defaultFill]);
-
-  // Mouse event handlers for panning
-  const handleMouseDown = (e) => {
-    setDragging(true);
-    dragStart.current = {
-      x: e.clientX,
-      y: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
+    });
+    const padding = 50;
+    return {
+      minX: minX - padding,
+      minY: minY - padding,
+      maxX: maxX + padding,
+      maxY: maxY + padding,
     };
   };
 
-  // Zoom handlers
-  const handleZoomIn = () => setZoom(z => Math.min(z + 0.2, 4));
-  const handleZoomOut = () => setZoom(z => Math.max(z - 0.2, 0.4));
-
-  const handleWheel = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey) return; // let browser zoom
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      setZoom(z => Math.min(z + 0.1, 4));
-    } else if (e.deltaY > 0) {
-      setZoom(z => Math.max(z - 0.1, 0.4));
-    }
+  // Fetch venue data and calculate bounds
+  useEffect(() => {
+    const apiEndpoint = 'https://getticketfor.me/api/get-venue/6866531c8f36f9bfef7a9aa0';
+    fetch(apiEndpoint)
+      .then(res => res.json())
+      .then(data => {
+        const bounds = calculateBounds(data.sectors);
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+        setSvgMarkup({ ...data, width, height, bounds });
+      })
+      .catch(() => setSvgMarkup({ width: 0, height: 0, sectors: [], bounds: null }));
   }, []);
 
-  // Clamp pan so the map cannot be moved outside the border
-  const clampPan = (x, y, zoomLevel) => {
-    // Parse viewBox: e.g. '0 0 800 600'
-    /* const [, , vbW, vbH] = svgViewBox.split(' ').map(Number); */
-    // Get the actual rendered SVG size
-    /* const svgContainer = svgWheelRef.current; */
-    /* let containerW = 900;
-    let containerH = 600;
-    if (svgContainer) {
-      containerW = svgContainer.clientWidth;
-      containerH = svgContainer.clientHeight;
-    } */
-    /* const scaledW = vbW * zoomLevel;
-    const scaledH = vbH * zoomLevel; */
-
-   /*  // Calculate the maximum pan offset
-    const maxOffsetX = containerW - scaledW;
-    const maxOffsetY = containerH - scaledH; */
-
-    // Allow for movement even at normal zoom level
-    const minX = -244.79;
-    const maxX = 244.79;
-    const minY = -133.32;
-    const maxY = 133.32;
-
-    return {
-      x: Math.max(Math.min(x, maxX), minX),
-      y: Math.max(Math.min(y, maxY), minY),
-    };
-  };
-
-  const handleMouseMove = (e) => {
-    if (!dragging || !dragStart.current || modalOpen) return; // Add modalOpen check
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    const unclamped = {
-      x: dragStart.current.panX + dx,
-      y: dragStart.current.panY + dy,
-    };
-    setPan(clampPan(unclamped.x, unclamped.y, zoom));
-  };
-
-  // Clamp pan when zoom changes
+  // Responsive scale to fit viewport
+  const [scaleFactor, setScaleFactor] = useState(1);
   useEffect(() => {
-    setPan(p => clampPan(p.x, p.y, zoom));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, svgViewBox]);
-
-  const handleMouseUp = () => {
-    setDragging(false);
-    dragStart.current = null;
-  };
-
-  useEffect(() => {
-    if (dragging) {
-      document.body.style.userSelect = 'none';
-      window.addEventListener('mouseup', handleMouseUp);
-    } else {
-      document.body.style.userSelect = '';
-      window.removeEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      document.body.style.userSelect = '';
-      window.removeEventListener('mouseup', handleMouseUp);
+    const updateScaleFactor = () => {
+      if (svgMarkup && svgMarkup.width && svgMarkup.height) {
+        const scaleW = window.innerWidth / svgMarkup.width;
+        const scaleH = window.innerHeight / svgMarkup.height;
+        const scale = Math.min(scaleW, scaleH, 1);
+        setScaleFactor(scale);
+      }
     };
-  }, [dragging]);
+    updateScaleFactor();
+    window.addEventListener('resize', updateScaleFactor);
+    return () => window.removeEventListener('resize', updateScaleFactor);
+  }, [svgMarkup]);
 
-  // Click handler for sectors
-  const handleSectorClick = (sector, event) => {
-    setActiveSector(sector.id);
-    // Pass the full sector object with d, fill, id, and svgMarkup for seat extraction
-    openSectorModal({ ...sector, svgMarkup });
+  const handleSectorClick = (sector) => {
+    setActiveSector(sector._id);
+    setSelectedSector(sector);
+    setModalOpen(true);
   };
 
-  // Aspect ratio logic (optional, you can adjust as needed)
-  // (aspectRatio is not used)
+  const handleMouseOver = (event) => {
+    event.target.setAttribute('fill', HOVER_FILL);
+  };
 
-  // Attach wheel event with passive: false to allow preventDefault
-  useEffect(() => {
-    const svgNode = svgWheelRef.current;
-    if (!svgNode) return;
-    svgNode.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      svgNode.removeEventListener('wheel', handleWheel);
-    }; 
-  }, [svgViewBox, handleWheel]);
+  const handleMouseOut = (event, sector) => {
+    event.target.setAttribute('fill', sector._id === activeSector ? ACTIVE_FILL : DEFAULT_FILL);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setActiveSector(null);
+    setSelectedSector(null);
+  };
+
+  // Safe fallback for bounds
+  const bounds = svgMarkup.bounds || { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
+  const width = svgMarkup.width || (bounds.maxX - bounds.minX);
+  const height = svgMarkup.height || (bounds.maxY - bounds.minY);
+
+  const viewBox = `0 0 ${width} ${height}`;
 
   return (
-    <div
-      className="w-full min-h-[600px] flex flex-col items-center justify-center relative"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Hidden SVG for extracting paths and viewBox */}
-      <div style={{ display: 'none' }}>
-        <VectorsSVG ref={svgExtractRef} />
-      </div>
-      <div
-        className="glass-map max-w-full w-[90vw] md:w-[900px] h-[60vw] md:h-[600px] flex items-center justify-center relative overflow-hidden border-4 border-[#6f6f66] rounded-2xl shadow-2xl"
-      >
-        {/* Zoom controls */}
-        <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
-          <button onClick={handleZoomIn} className="btn-primary">+</button>
-          <button onClick={handleZoomOut} className="btn-primary">−</button>
-        </div>
+    <div style={{ width: '100%', height: '100vh', overflow: 'auto' }}>
+      {svgMarkup && svgMarkup.sectors && svgMarkup.sectors.length > 0 ? (
         <svg
-          ref={svgWheelRef}
+          ref={svgRef}
           width="100%"
           height="100%"
-          viewBox={svgViewBox}
-          className="block w-full h-full rounded-2xl shadow-lg transition"
-          style={{ background: 'rgba(255,255,255,0.15)', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' }}
-          
+          viewBox={viewBox}
+          preserveAspectRatio="xMinYMin meet"
+          style={{ height: '90vh' }}
         >
-          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-            {sectors.map(sector => {
-              let fill = sector.fill;
-              let stroke = '#1976d2';
-              let strokeWidth = 1;
-              if (activeSector === sector.id) {
-                fill = ACTIVE_FILL;
-                stroke = '#1976d2';
-                strokeWidth = 3;
-              } else if (hoveredSector === sector.id) {
-                fill = HOVER_FILL;
-                stroke = '#1976d2';
-                strokeWidth = 3;
-              }
-              return (
-                <path
-                  key={sector.id}
-                  d={sector.d}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={strokeWidth}
-                  style={{ transition: 'fill 0.2s, stroke 0.2s, stroke-width 0.2s', cursor: 'pointer', outline: 'none' }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleSectorClick(sector, e);
-                  }}
-                  tabIndex={0}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      handleSectorClick(sector, e);
-                    }
-                  }}
-                  aria-label={sector.id}
-                  role="button"
-                  onMouseEnter={() => setHoveredSector(sector.id)}
-                  onMouseLeave={() => setHoveredSector(null)}
-                  onFocus={() => setHoveredSector(sector.id)}
-                  onBlur={() => setHoveredSector(null)}
-                />
-              );
-            })}
+          <g transform={`translate(${-bounds.minX}, ${-bounds.minY})`}>
+            {svgMarkup.sectors.map((sector) => (
+              <path
+                key={sector._id}
+                d={sector.svgPathData}
+                fill={sector._id === activeSector ? ACTIVE_FILL : DEFAULT_FILL}
+                data-id={sector._id}
+                onMouseOver={handleMouseOver}
+                onMouseOut={(e) => handleMouseOut(e, sector)}
+                onClick={() => handleSectorClick(sector)}
+                style={{ cursor: 'pointer' }}
+              />
+            ))}
           </g>
         </svg>
-      </div>
-      {/* Render modal at the end so it overlays everything */}
-      <SectorModal open={modalOpen} sector={selectedSector} onClose={closeModal} svgMarkup={svgMarkup} />
+      ) : (
+        <div>Loading venue data...</div>
+      )}
+
+      {modalOpen && selectedSector && (
+        <SectorModal
+          open={modalOpen}
+          sector={{ ...selectedSector, d: selectedSector.svgPathData }} // normalize prop name for SectorModal
+          onClose={handleCloseModal}
+          svgMarkup={svgMarkup}
+        />
+      )}
     </div>
   );
 };
 
-MapContainer.propTypes = {
+VectorShapes.propTypes = {
   width: PropTypes.number,
   height: PropTypes.number,
   defaultFill: PropTypes.string,
 };
-MapContainer.defaultProps = {
+
+VectorShapes.defaultProps = {
   width: 800,
   height: 600,
   defaultFill: '#e0e0e0',
 };
 
-export default MapContainer;
+export default VectorShapes;
