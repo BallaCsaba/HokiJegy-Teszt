@@ -11,7 +11,6 @@ const VectorShapes = () => {
   const [selectedSector, setSelectedSector] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeSector, setActiveSector] = useState(null);
-
   const svgRef = useRef(null);
 
   // Extract points from path string for bounding box calculations
@@ -71,11 +70,14 @@ const VectorShapes = () => {
       if (svgMarkup && svgMarkup.width && svgMarkup.height) {
         const scaleW = window.innerWidth / svgMarkup.width;
         const scaleH = window.innerHeight / svgMarkup.height;
-        const scale = Math.min(scaleW, scaleH, 1);
-        setScaleFactor(scale);
+        // Allow scaling up and down freely, but limit minimum scale to 0.3 to avoid too small
+        const scale = Math.min(scaleW, scaleH);
+        const adjustedScale = scale < 1 ? 1 : scale; // minimum 0.3
+        setScaleFactor(adjustedScale);
       }
     };
     updateScaleFactor();
+    console.log(scaleFactor);
     window.addEventListener('resize', updateScaleFactor);
     return () => window.removeEventListener('resize', updateScaleFactor);
   }, [svgMarkup]);
@@ -100,11 +102,28 @@ const VectorShapes = () => {
     setSelectedSector(null);
   };
 
-  // Safe fallback for bounds
+  // Store centers after mount
+  const [sectorCenters, setSectorCenters] = useState({});
+
+  useEffect(() => {
+    if (!svgMarkup.sectors || svgMarkup.sectors.length === 0) return;
+
+    const centers = {};
+    svgMarkup.sectors.forEach(sector => {
+      const pathElement = document.getElementById(`path-${sector._id}`);
+      if (pathElement) {
+        const bbox = pathElement.getBBox();
+        centers[sector._id] = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2, bbox };
+      }
+    });
+    setSectorCenters(centers);
+  }, [svgMarkup]);
+
+  // Instead of viewBox starting at minX, minY, set it to 0 0 width height
+  // We'll translate all shapes by (-minX, -minY) so they fit inside this coordinate space
   const bounds = svgMarkup.bounds || { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
   const width = svgMarkup.width || (bounds.maxX - bounds.minX);
   const height = svgMarkup.height || (bounds.maxY - bounds.minY);
-
   const viewBox = `0 0 ${width} ${height}`;
 
   return (
@@ -113,24 +132,81 @@ const VectorShapes = () => {
         <svg
           ref={svgRef}
           width="100%"
-          height="100%"
+          height="99%"
           viewBox={viewBox}
           preserveAspectRatio="xMinYMin meet"
-          style={{ height: '90vh' }}
+          style={{ height: '99vh' }}
         >
-          <g transform={`translate(${-bounds.minX}, ${-bounds.minY})`}>
-            {svgMarkup.sectors.map((sector) => (
-              <path
-                key={sector._id}
-                d={sector.svgPathData}
-                fill={sector._id === activeSector ? ACTIVE_FILL : DEFAULT_FILL}
-                data-id={sector._id}
-                onMouseOver={handleMouseOver}
-                onMouseOut={(e) => handleMouseOut(e, sector)}
-                onClick={() => handleSectorClick(sector)}
-                style={{ cursor: 'pointer' }}
-              />
-            ))}
+          {/* Translate by (-minX, -minY) to bring all shapes to positive coords, then scale */}
+          <g transform={`translate(${-bounds.minX},${-bounds.minY}) scale(${scaleFactor})`}>
+            {svgMarkup.sectors.map((sector) => {
+              // Calculate available seats count
+              let availableSeats = 0;
+              if (sector.sectorRows && sector.sectorRows.length > 0) {
+                sector.sectorRows.forEach(row => {
+                  if (row.rowSeats && row.rowSeats.length > 0) {
+                    availableSeats += row.rowSeats.filter(seat => seat.isAvailable).length;
+                  }
+                });
+              }
+
+              const center = sectorCenters[sector._id] || { x: 0, y: 0, bbox: null };
+              const isDisabledSector = (sector.sectorCode?.toLowerCase().includes('disabled') || sector._id.toLowerCase().includes('disabled'));
+
+              // Adjust text position for disabled sector to bottom center of bbox
+              let textX = center.x;
+              let textY = center.y;
+              if (isDisabledSector && center.bbox) {
+                textX = center.bbox.x + center.bbox.width / 2;
+                textY = center.bbox.y + center.bbox.height - 10; // 10px padding from bottom
+              }
+
+              const textContent = `${availableSeats} available`;
+
+              return (
+                <g key={sector._id}>
+                  <path
+                    id={`path-${sector._id}`}
+                    d={sector.svgPathData}
+                    fill={sector._id === activeSector ? ACTIVE_FILL : DEFAULT_FILL}
+                    data-id={sector._id}
+                    onMouseOver={handleMouseOver}
+                    onMouseOut={(e) => handleMouseOut(e, sector)}
+                    onClick={() => handleSectorClick(sector)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  {/* Background rectangle behind the text */}
+                  <rect
+                    x={textX - 50}
+                    y={textY - 15}
+                    width={100}
+                    height={24}
+                    rx={4}
+                    ry={4}
+                    fill="rgba(255, 255, 255, 0.8)"
+                    pointerEvents="none"
+                  />
+                  {/* Text label */}
+                  <text
+                    x={textX}
+                    y={textY + 3} // vertically center text within rect
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    style={{
+                      userSelect: 'none',
+                      pointerEvents: 'none',
+                      fontSize: 18,
+                      fontWeight: 'bold',
+                      fill: '#222',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
+                      fontFamily: 'Arial, sans-serif',
+                    }}
+                  >
+                    {textContent}
+                  </text>
+                </g>
+              );
+            })}
           </g>
         </svg>
       ) : (
