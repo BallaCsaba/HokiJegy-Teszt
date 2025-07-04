@@ -51,7 +51,7 @@ const VectorShapes = () => {
 
   // Fetch venue data and calculate bounds
   useEffect(() => {
-    const apiEndpoint = 'https://getticketfor.me/api/get-venue/6866531c8f36f9bfef7a9aa0';
+    const apiEndpoint = 'https://getticketfor.me/api/get-venue/686774522f01fe37d70152af';
     fetch(apiEndpoint)
       .then(res => res.json())
       .then(data => {
